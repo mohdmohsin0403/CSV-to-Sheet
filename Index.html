@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+  </head>
+  <body>
+    <h2>CSV Importer</h2>
+    <label for="importSource">Select Import Source:</label>
+    <select id="importSource">
+      <option value="local">Local File</option>
+      <option value="drive">Google Drive URL</option>
+    </select>
+    <br><br>
+    <div id="localFileSection">
+      <label for="csvFile">Select a CSV File:</label>
+      <input type="file" id="csvFile" accept=".csv">
+      <br><br>
+      <button onclick="fetchLocalColumns()">Fetch Columns</button>
+    </div>
+    <div id="driveURLSection" style="display: none;">
+      <label for="driveURL">Enter Google Drive URL:</label>
+      <input type="text" id="driveURL" placeholder="Enter Google Drive URL">
+      <br><br>
+      <button onclick="fetchDriveColumns()">Fetch Columns</button>
+    </div>
+    <label for="columns">Select Columns to Import:</label>
+    <select id="columns" multiple></select>
+    <br><br>
+    <label for="importType">Select Import Type:</label>
+    <select id="importType">
+      <option value="existing">Import into Existing Sheet</option>
+      <option value="new">Import into New Sheet</option>
+    </select>
+    <br><br>
+    <button onclick="importCSV()">Import</button>
+    <br><br>
+    <div id="statusMessage"></div>
+    <script>
+      let lines; // Declare lines variable in a broader scope
+
+      // Function to show/hide sections based on import source selection
+      function toggleSections() {
+        const importSource = document.getElementById('importSource').value;
+        const localFileSection = document.getElementById('localFileSection');
+        const driveURLSection = document.getElementById('driveURLSection');
+
+        if (importSource === 'local') {
+          localFileSection.style.display = 'block';
+          driveURLSection.style.display = 'none';
+        } else {
+          localFileSection.style.display = 'none';
+          driveURLSection.style.display = 'block';
+        }
+      }
+
+      document.getElementById('importSource').addEventListener('change', toggleSections);
+
+      // Initial state
+      toggleSections();
+
+      function fetchLocalColumns() {
+        const fileInput = document.getElementById('csvFile');
+        const columnsSelect = document.getElementById('columns');
+        columnsSelect.innerHTML = '';
+
+        if (fileInput.files.length === 0) {
+          alert('Please select a local CSV file.');
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+          const contents = e.target.result;
+          lines = contents.split('\n'); // Store lines data in the variable
+          const headerRow = lines[0].split(',');
+
+          headerRow.forEach((column, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = column;
+            columnsSelect.appendChild(option);
+          });
+        };
+
+        reader.readAsText(file);
+      }
+
+      function fetchDriveColumns() {
+        const driveURL = document.getElementById('driveURL').value;
+        if (!driveURL) {
+          alert('Please enter a Google Drive URL.');
+          return;
+        }
+
+        // Fetch column names when the "Fetch Columns" button is clicked
+        google.script.run.withSuccessHandler(populateColumnsSelect).getCSVColumnsFromDrive(driveURL);
+      }
+
+      // Function to populate the columns select element
+      function populateColumnsSelect(columns) {
+        const columnsSelect = document.getElementById('columns');
+        columnsSelect.innerHTML = '';
+
+        columns.forEach((column, index) => {
+          const option = document.createElement('option');
+          option.value = index;
+          option.textContent = column;
+          columnsSelect.appendChild(option);
+        });
+      }
+
+      function importCSV() {
+        const importSource = document.getElementById('importSource').value;
+
+        if (importSource === 'local') {
+          const selectedColumns = Array.from(document.getElementById('columns').selectedOptions).map(option => option.value);
+
+          if (selectedColumns.length === 0) {
+            alert('Please select at least one column to import.');
+            return;
+          }
+
+          const importType = document.getElementById('importType').value;
+
+          google.script.run.withSuccessHandler(importSuccessCallback).import_CSV(selectedColumns, lines, importType);
+        } else {
+          const selectedColumns = Array.from(document.getElementById('columns').selectedOptions).map(option => option.value);
+
+          if (selectedColumns.length === 0) {
+            alert('Please select at least one column to import.');
+            return;
+          }
+
+          const importType = document.getElementById('importType').value;
+
+          google.script.run.withSuccessHandler(importSuccessCallback).import_CSV(selectedColumns, lines, importType);
+        }
+      }
+
+      function importSuccessCallback(response) {
+        if (response === 'success') {
+          document.getElementById('csvFile').value = '';
+          document.getElementById('driveURL').value = '';
+          document.getElementById('statusMessage').textContent = 'Import done successfully.';
+        } else {
+          alert('Error occurred during import.');
+        }
+      }
+    </script>
+  </body>
+</html>
